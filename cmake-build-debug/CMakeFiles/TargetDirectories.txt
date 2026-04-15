@@ -1,0 +1,3 @@
+/home/student/SO_Delia/phase1.c/cmake-build-debug/CMakeFiles/phase1_c.dir
+/home/student/SO_Delia/phase1.c/cmake-build-debug/CMakeFiles/edit_cache.dir
+/home/student/SO_Delia/phase1.c/cmake-build-debug/CMakeFiles/rebuild_cache.dir
