@@ -1,10 +1,4 @@
-/opt/clion-2024.3.2/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/opt/clion-2024.3.2/bin/ninja/linux/x64/ninja -G Ninja -S /home/student/SO_Delia/phase1.c -B /home/student/SO_Delia/phase1.c/cmake-build-debug
--- The C compiler identification is GNU 12.2.0
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
--- Detecting C compile features
--- Detecting C compile features - done
--- Configuring done (0.2s)
--- Generating done (0.0s)
--- Build files have been written to: /home/student/SO_Delia/phase1.c/cmake-build-debug
+/usr/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "Unix Makefiles" -S /mnt/c/Users/pc/CLionProjects/Proiect_SO_Jdioreantu_Delia -B /mnt/c/Users/pc/CLionProjects/Proiect_SO_Jdioreantu_Delia/cmake-build-debug
+-- Configuring done (2.2s)
+-- Generating done (3.3s)
+-- Build files have been written to: /mnt/c/Users/pc/CLionProjects/Proiect_SO_Jdioreantu_Delia/cmake-build-debug
