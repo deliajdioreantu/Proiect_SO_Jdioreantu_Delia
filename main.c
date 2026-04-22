@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include<time.h>
 
 #define NAME 50
@@ -28,9 +29,9 @@ typedef struct {
 }REPORT;
 
 void create(const char *district) {
-    if (mkdir(district, 0750) == -1) {
-        if (errno != EEXIST) {
-            perror("Mkdir error\n");
+    if (mkdir(district, 0750) == -1) { //daca exista deja
+        if (errno == EEXIST) {
+            printf("District %s already exists\n",district);
             return;
         }
     }// Setare explicita pentru siguranta
@@ -79,7 +80,6 @@ void add_report(const char *district,const char *user) {
     char path[PATH_SIZE];
     int f;
 
-    create(district);
     printf("X: "); scanf("%f", &r.gps.latitude);
     printf("Y: "); scanf("%f", &r.gps.longitude);
 
@@ -89,7 +89,7 @@ void add_report(const char *district,const char *user) {
     printf("Severity level (1/2/3): ");
     scanf("%d",&r.severity);
 
-    getchar(); // Consumă newline-ul rămas în buffer pentru ca fgets să funcționeze [cite: 132]
+    getchar(); // Consumă newline-ul rămas în buffer pentru ca fgets să funcționeze
     printf("Description: ");
     fgets(r.description, DESCR, stdin);
     r.description[strcspn(r.description, "\n")] = 0;
@@ -168,7 +168,8 @@ void list(const char *district) {
 
     perms[9]='\0';
 
-    printf("Permissionhs: %s\n",perms);
+    printf("File informations:\n");
+    printf("Permissions: %s\n",perms);
     printf("File size: %ld bytes\n", st.st_size);
     printf("Last modification: %s", ctime(&st.st_mtime));
     close(f);
@@ -203,11 +204,11 @@ void view(const char *district,int report_id) {
     close(f);
 }
 
-/*int check_permissions(const char *path, const char *role, char action) {
+int check_permissions(const char *path, const char *role, char action) {
     struct stat st;
     if (stat(path, &st) == -1) return 0;
 
-    // Managerii sunt proprietari (User bits), Inspectorii sunt grupul (Group bits)
+    // Managerul e user, inspectorii sunt grupul
     if (strcmp(role, "manager") == 0) {
         if (action == 'r') return (st.st_mode & S_IRUSR);
         if (action == 'w') return (st.st_mode & S_IWUSR);
@@ -216,42 +217,7 @@ void view(const char *district,int report_id) {
         if (action == 'w') return (st.st_mode & S_IWGRP);
     }
     return 0;
-}*/
-int check_permissions(const char *path,const char *role,char action) {
-    struct stat st;
-    if (stat(path,&st)==-1) {
-        perror("Error stat\n");
-        return 0;
-    }
-
-    char perms[10];
-    perms[0]=(st.st_mode & S_IRUSR) ? 'r' : '-';
-    perms[1]=(st.st_mode & S_IWUSR) ? 'w' : '-';
-    perms[2]=(st.st_mode & S_IXUSR) ? 'x' : '-';
-
-    perms[3]=(st.st_mode & S_IRGRP) ? 'r' : '-';
-    perms[4]=(st.st_mode & S_IWGRP) ? 'w' : '-';
-    perms[5]=(st.st_mode & S_IXGRP) ? 'x' : '-';
-
-    perms[6]=(st.st_mode & S_IROTH) ? 'r' : '-';
-    perms[7]=(st.st_mode & S_IWOTH) ? 'w' : '-';
-    perms[8]=(st.st_mode & S_IXOTH) ? 'x' : '-';
-
-    perms[9]='\0';
-
-    //manager=owner -> primii 3 biti
-    //inspector=group ->urmatorii  biti
-    if (strcmp(role,"manager")==0) {
-        if (action == 'r') return perms[0]=='r';
-        if (action == 'w') return perms[1]=='w';
-    }
-    else {
-        if (action == 'r') return perms[3]=='r';
-        if (action == 'w') return perms[4]=='w';
-    }
-    return 0;
 }
-
 
 void update_threshold(const char *district,int value) {
     char path[PATH_SIZE];
@@ -269,7 +235,7 @@ void update_threshold(const char *district,int value) {
     printf("Threshold actualizat la %d\n",value);
 }
 int main(int argc,char *argv[]) {
-    if (argc <5) {
+    if (argc <7) {
         printf("Too few arguments\n");
         return 1;
     }
@@ -280,25 +246,53 @@ int main(int argc,char *argv[]) {
     char *district=argv[6];
     struct stat st;
 
+    create(district);
+    if (strcmp(role, "manager")!=0 && strcmp(role,"inspector") != 0) {
+        printf("Invalid arguments\n");
+        return 1;
+    }
     char path[PATH_SIZE];
     snprintf(path,sizeof(path),"%s/reports.dat",district);
 
     if (strcmp(command,"--add")==0) {
-        add_report(district,user);
-        add_logged_district(district,user,role,"add");
+        if (check_permissions(path,role,'w')) {
+            add_report(district,user);
+            if (strcmp(role,"manager")==0)
+                add_logged_district(district,user,role,"add");
+        }
+        else {
+            perror("Error: Current role doesn't have permission to write\n");
+        }
     }
     else if (strcmp(command,"--list")==0) {
         if (check_permissions(path,role,'r')) {
             list(district);
-            add_logged_district(district,user,role,"list");
+            if (strcmp(role,"manager")==0)
+                add_logged_district(district,user,role,"list");
         }
         else {
-           perror("Error: Current role doesn't have permission to read");
+            perror("Error: Current role doesn't have permission to read");
         }
     }
-    /*else if (strcmp(command,"--view")==0) {
+    else if (strcmp(command,"--view")==0) {
         if (check_permissions(path,role,"r")) {
-
-        }*/
+            if (argc<8) {
+                printf("Trebuie sa existe si id\n");
+                exit(1);
+            }
+            view(district,atoi(argv[7]));
+            if (strcmp(role,"manager")==0)
+                add_logged_district(district,user,role,"view");
+        }
+        else {
+            perror("Error: Current role doesn't have permission to read");
+        }
+    }
+    else if (strcmp(command,"--update_threshold")==0 && strcmp(role,"manager")==0) {
+        if (argc<8) {
+            printf("Date insuficiente\n");
+            exit(1);
+        }
+    }
     return 0;
 }
