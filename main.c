@@ -31,11 +31,12 @@ typedef struct {
 void create(const char *district) {
     if (mkdir(district, 0750) == -1) { //daca exista deja
         if (errno == EEXIST) {
-            printf("District %s already exists\n",district);
+            perror("Error mkdir");
             return;
         }
-    }// Setare explicita pentru siguranta
-    chmod(district, 0750);
+    }
+    /*// Setare explicita pentru siguranta
+    chmod(district, 0750);*/
 
     char path[PATH_SIZE];
     int f;
@@ -72,7 +73,21 @@ void create(const char *district) {
     char link_name[LINK_SIZE];
     snprintf(link_name,sizeof(link_name),"active_reports-%s",district); //numele linkului
     snprintf(path,sizeof(path),"%s/reports.dat",district); //"tinta", catre cine duce linkul
-    symlink(path, link_name);
+
+    struct stat lst;
+    if (lstat(link_name,&lst)==0) {
+        //exista ceva cu numele asta
+        struct stat st;
+        if (stat(link_name,&st)==-1) { //esuat,dangling link
+            printf("Warning! Dangling symlink %s\n",link_name);
+            unlink(link_name); //sterge symlink-ul vechi
+            symlink(path,link_name);
+        }
+    }
+    else {
+        symlink(path,link_name); //daca nu exista deloc,il creem
+    }
+    //dangling link-daca s a sterg fisierul din path,symlinkul continue sa existe
 }
 
 void add_report(const char *district,const char *user) {
@@ -107,8 +122,9 @@ void add_report(const char *district,const char *user) {
     if (write(f, &r, sizeof(REPORT)) == -1) {
         perror("Error saving report!\n");
     } else {
-        printf("Succes! Raportul a fost salvat cu ID: %d\n", r.id);
+        printf("Raport saved with ID: %d\n", r.id);
     }
+    close(f);
 }
 
 void add_logged_district(const char *district,const char *user, const char *role,const char *action){
@@ -118,10 +134,14 @@ void add_logged_district(const char *district,const char *user, const char *role
 
     snprintf(path,sizeof(path),"%s/logged_district", district);
     f=open(path,O_WRONLY| O_APPEND,0644);
+    if (f == -1) {
+        perror("Open error logged_district");
+        return;
+    }
 
     time_t now=time(NULL);
     snprintf(log,sizeof(log),"%s\t%ld\t%s\t%s\n",action,(long)now,role,user);
-    write(f,log,sizeof(log));
+    write(f,log,strlen(log)); //ca sa scrie doar caracterele utile,exact cate sunt in log
     close(f);
 }
 
@@ -132,7 +152,7 @@ void list(const char *district) {
     snprintf(path,sizeof(path),"%s/reports.dat",district);
     f=open(path,O_RDONLY);
     if (f==-1) {
-        perror("Error opening reports.dat file!\n");
+        fprintf(stderr,"Error opening reports.dat file!\n");
         return;
     }
 
@@ -183,7 +203,7 @@ void view(const char *district,int report_id) {
     snprintf(path,sizeof(path),"%s/reports.dat",district);
     f=open(path,O_RDONLY);
     if (f==-1) {
-        perror("Error opening reports.dat file!\n");
+        fprintf(stderr,"Error opening reports.dat file!\n");
         return;
     }
 
@@ -221,18 +241,28 @@ int check_permissions(const char *path, const char *role, char action) {
 
 void update_threshold(const char *district,int value) {
     char path[PATH_SIZE];
-    int f;
     snprintf(path,sizeof(path),"%s/district.cfg",district);
-    f=open(path,O_WRONLY | O_TRUNC, 0640);
+
+    struct stat st;
+    if (stat(path,&st)==-1) {
+        perror("Stat failed on distrct.cfg");
+        return;
+    }
+    if ( (st.st_mode & 0777)!= 0640) {
+        fprintf(stderr,"Error! The permissions of district.cfg have been modified\n");
+        return;
+    }
+
+    int f=open(path,O_WRONLY | O_TRUNC, 0640);
     if (f==-1) {
-        perror("Error opening district.cfg file!\n");
+        fprintf(stderr,"Error opening district.cfg file!\n");
         return;
     }
     char buff[64];
     snprintf(buff,sizeof(buff),"Threshold=%d\n",value);
     write(f,buff,strlen(buff));
     close(f);
-    printf("Threshold actualizat la %d\n",value);
+    printf("Threshold updated: %d\n",value);
 }
 int main(int argc,char *argv[]) {
     if (argc <7) {
@@ -246,7 +276,8 @@ int main(int argc,char *argv[]) {
     char *district=argv[6];
     struct stat st;
 
-    create(district);
+
+    //create(district);
     if (strcmp(role, "manager")!=0 && strcmp(role,"inspector") != 0) {
         printf("Invalid arguments\n");
         return 1;
@@ -255,15 +286,18 @@ int main(int argc,char *argv[]) {
     snprintf(path,sizeof(path),"%s/reports.dat",district);
 
     if (strcmp(command,"--add")==0) {
+        create(district);
+
         if (check_permissions(path,role,'w')) {
             add_report(district,user);
             if (strcmp(role,"manager")==0)
                 add_logged_district(district,user,role,"add");
         }
         else {
-            perror("Error: Current role doesn't have permission to write\n");
+            fprintf(stderr,"Error: Current role doesn't have permission to write\n");
         }
     }
+
     else if (strcmp(command,"--list")==0) {
         if (check_permissions(path,role,'r')) {
             list(district);
@@ -271,28 +305,40 @@ int main(int argc,char *argv[]) {
                 add_logged_district(district,user,role,"list");
         }
         else {
-            perror("Error: Current role doesn't have permission to read");
+            fprintf(stderr,"Error: Current role doesn't have permission to read");
         }
     }
+
     else if (strcmp(command,"--view")==0) {
-        if (check_permissions(path,role,"r")) {
+        if (check_permissions(path,role,'r')) {
+
             if (argc<8) {
-                printf("Trebuie sa existe si id\n");
+                printf("Command %s should contain report id\n",command);
                 exit(1);
             }
+
             view(district,atoi(argv[7]));
             if (strcmp(role,"manager")==0)
                 add_logged_district(district,user,role,"view");
         }
         else {
-            perror("Error: Current role doesn't have permission to read");
+            fprintf(stderr,"Error: Current role doesn't have permission to read");
         }
     }
-    else if (strcmp(command,"--update_threshold")==0 && strcmp(role,"manager")==0) {
-        if (argc<8) {
-            printf("Date insuficiente\n");
+
+    else if (strcmp(command,"--update_threshold")==0) {
+
+        if ( strcmp(role,"manager") !=0) {
+            fprintf(stderr, "Error: only manager can update threshold\n");
             exit(1);
         }
+        if (argc<8) {
+            printf("Command %s should contain value of the new threshold.\n",command);
+            exit(1);
+        }
+
+        update_threshold(district,atoi(argv[7]));
+        add_logged_district(district,user,role,"update_threshold");
     }
     return 0;
 }
