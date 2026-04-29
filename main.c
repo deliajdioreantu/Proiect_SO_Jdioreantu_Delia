@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/stat.h>
+#include<sys/wait.h>
 #include<unistd.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -456,6 +457,26 @@ void filter(const char *district,int argc, char *argv[]) {
     close(f);
 }
 
+void remove_district(const char *district) {
+    char link_name[LINK_SIZE];
+    snprintf(link_name, sizeof(link_name),"active_reports-%s",district);
+    unlink(link_name);
+
+    pid_t pid=fork();
+    if (pid<0) {
+        perror("Fork failed");
+        exit(1);
+    }
+    if (pid==0) { //codul fiului
+        execlp("rm", "rm","-rf","Complex",NULL);
+        perror("Exec failed");
+        exit(1);
+    }
+    //cod parinte
+    wait(NULL);
+    printf("District %s removed.\n",district);
+
+}
 
 int main(int argc,char *argv[]) {
     if (argc <7) {
@@ -572,5 +593,15 @@ int main(int argc,char *argv[]) {
             fprintf(stderr,"Error: Current role doesn't have permission to read");
         }
     }
-        return 0;
+
+    else if (strcmp(command,"--remove_district")==0) {
+        if (strcmp(role,"manager")==0) {
+            remove_district(district);
+        }
+        else {
+            fprintf(stderr,"Error: Current role doesn't have permission.\n");
+        }
+    }
+
+    return 0;
 }
