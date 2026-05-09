@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include<time.h>
+#include<signal.h>
 
 #define NAME 50
 #define CAT 30
@@ -468,7 +469,7 @@ void remove_district(const char *district) {
         exit(1);
     }
     if (pid==0) { //codul fiului
-        execlp("rm", "rm","-rf","Complex",NULL);
+        execlp("rm", "rm","-rf",district,NULL);
         perror("Exec failed");
         exit(1);
     }
@@ -477,6 +478,40 @@ void remove_district(const char *district) {
     printf("District %s removed.\n",district);
 
 }
+
+void notify_monitor(const char *district,const char *user,const char *role) {
+    int monitor_informed=0;
+    int f=open(".monitor_pid",O_RDONLY);
+    if (f!=-1) {
+        char string_pid[10];
+
+        int bytes=read(f,string_pid,sizeof(string_pid)-1);
+        close(f);
+
+        if (bytes>0) {
+            string_pid[bytes]='\0';
+            pid_t monitor_pid=atoi(string_pid);
+
+            if (kill(monitor_pid, SIGUSR1)==0)
+                monitor_informed=1;
+        }
+    }
+
+    char text[100];
+    if (monitor_informed!=0) {
+        snprintf(text,sizeof(text), "ADD REPORT- MONITOR INFORMED");
+        printf("Monitorul a fost informat cu succes.\n");
+    }
+    else {
+        snprintf(text,sizeof(text),"ADD REPORT- MONITOR COULD NOT BE INFORMED");
+        fprintf(stderr,"Eroare: Monitorul nu a putut fi informat!\n");
+    }
+
+    add_logged_district(district,user,role,text);
+}
+
+
+
 
 int main(int argc,char *argv[]) {
     if (argc <7) {
@@ -503,11 +538,9 @@ int main(int argc,char *argv[]) {
     create(district);
 
     if (strcmp(command,"--add")==0) {
-
         if (check_permissions(path_reports,role,'w')) {
             add_report(district,user);
-            if (strcmp(role,"manager")==0)
-                add_logged_district(district,user,role,"add");
+            notify_monitor(district,user,role);
         }
         else {
             fprintf(stderr,"Error: Current role doesn't have permission to write\n");

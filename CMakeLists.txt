@@ -3,4 +3,5 @@ project(phase1_c C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(phase1_c main.c)
+add_executable(phase1_c main.c
+        monitor_reports.c)

@@ -1,3 +1,4 @@
+Phase 1
 1. Tool AI folosit: Claude.
 
 2. Prompt-uri:
@@ -30,3 +31,11 @@ pentru urmatoarele conditii. Am adaugat si am lucrat pe o copie, ca string ul in
 5. Ce am invatat:
 Ca tipul time_t necesita atol() nu atoi() pentru conversie.
 
+Phase 2  
+ Proiectul nu permite utilizarea funcției signal(), cerandu-se sigaction().  
+ Am cerut AI-ului sa imi explice structura sigaction, cum configurez campurile si cum pot preveni erorile atunci cand programul este intrerupt de semnalele SIGUSR1 si SIGINT
+ Solutie: Am configurat masca de semnale folosind sigemptyset si am adăugat flag-ul SA_RESTART ca sistemul sa reia automat apelurile intrerupte.
+ Ce am învatat: Am invatat ca semnalele pot intrerupe executia normala a programului si ca sigaction ofera un control mult mai bun si sigur
+ asupra comportamentului procesului fata de apelul signal. De asemenea, am aflat ca SA_RESTART face ca apelurile de sistem (de ex pause()) sa fie reluate automat
+dupa intreruperea de catre un semnal, si ca in interiorul unui handler trebuie folosite doar functii "async-signal-safe",
+motiv pentru care am înlocuit printf() cu write().
