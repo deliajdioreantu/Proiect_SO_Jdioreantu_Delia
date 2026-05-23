@@ -39,3 +39,13 @@ Phase 2
  asupra comportamentului procesului fata de apelul signal. De asemenea, am aflat ca SA_RESTART face ca apelurile de sistem (de ex pause()) sa fie reluate automat
 dupa intreruperea de catre un semnal, si ca in interiorul unui handler trebuie folosite doar functii "async-signal-safe",
 motiv pentru care am înlocuit printf() cu write().
+
+
+Phase 3   
+Ce am cerut: Am cerut ajutor la corectare si debugging. Intampinam probleme cu suprapunerea mesajelor. Cand porneam monitorul in fundal,mesajul de succes aparea pe ecran peste "city_hub> " stricand aspectul.  
+Ce s-a generat: AI-ul a propus o solutie rapida: sa adaug un printf("city_hub> ") in procesul lui hub_mon.   
+Ce am modificat: Dupa ce am analizat mi-am dat seama ca solutia nu era tocmai una potrivita pentru toate cazurile. "hub_mon" este un proces separat si nu ar trebui sa printeze lucruri care tin de interfata deoarece ar stricta aspectul terminalului la fiecare semnal SIGUSR1.
+Am ales sa adaug in main tradarea liniei goale, astfel, la apasarea Enter programul afiseaza din nou "city_hub> ".  
+De asemenea, in functia calculate_scores am mutat waitpid intr-un for separat la final. Initial il aveam în același for cu read, ceea ce insemna ca parintele astepta fiecare scorer sa se termine inainte sa treaca la urmatorul. Am ințeles ca asta putea cauza un deadlock: daca pipe-ul se umplea, scorerul se bloca asteptand sa fie citit, iar parintele era blocat la waitpid. Acum parintele citeste din toate pipe-urile mai intai, apoi abia la final apeleaza waitpid pentru fiecare scorer in parte, evitand procesele zombie.  
+Ce am invatat: Cand faci fork(), bufferul stdout se copiaza in procesul copil, deci trebuie folosit fflush(stdout) pentru a preveni duplicarea textului.    
+Inchiderea corecta a capetelor de pipe nefolosite este esentiala pentru ca functia read() sa primeasca 0 (End of File) si sa nu ramana blocata la infinit.

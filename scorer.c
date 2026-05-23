@@ -1,9 +1,4 @@
 #include "library.h"
-typedef struct ScorInspector{
-  char name[NAME];
-  int score;
-}ScorInspector;
-
 int main(int argc, char *argv[]){
   if(argc<2){
      printf("Scorer error: missing district!\n");
@@ -19,7 +14,7 @@ int main(int argc, char *argv[]){
      return 1;
   }
 
-  ScorInspector scores[100];
+  ScorInspector scores[100]={0};
   int nr_inspectori=0;
   REPORT r;
 
@@ -32,10 +27,10 @@ int main(int argc, char *argv[]){
          break;
       }
     }
-
+    //inspectorul nu exista
     if(gasit==0 && nr_inspectori<100){
       strcpy(scores[nr_inspectori].name,r.inspectorName);
-      scores[nr_inspectori].score+=r.severity;
+      scores[nr_inspectori].score=r.severity;
       nr_inspectori++;
     }
   }

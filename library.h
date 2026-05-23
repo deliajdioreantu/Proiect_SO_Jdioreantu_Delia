@@ -29,3 +29,8 @@ typedef struct {
     time_t timestamp;
     char description[DESCR];
 }REPORT;
+
+typedef struct ScorInspector{
+    char name[NAME];
+    int score;
+}ScorInspector;
